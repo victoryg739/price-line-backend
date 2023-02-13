@@ -14,12 +14,117 @@ def post_collection(request):
     serializer = PostSerializer(data=request.data)
     if serializer.is_valid():
         serializer.save()
-        govDataUrl ='https://data.gov.sg/api/action/datastore_search?resource_id=f1765b54-a209-4718-8d38-a39237f502b3&filters={"town":"'+ serializer.data['town'] + '","flat_type": "' + serializer.data['flatType'] +'","flat_model":"'+serializer.data['flatModel']+'"}'
+        #if flat model or flatType is any 
+        govDataUrl ='https://data.gov.sg/api/action/datastore_search?resource_id=f1765b54-a209-4718-8d38-a39237f502b3&filters={"town":"'+ serializer.data['town'] + '"'
+        extraUrl = ""
+        if(serializer.data['flatType'] != "Any"):
+            extraUrl =  ',"flat_type": "' + serializer.data['flatType'] + '"'
+        
+        if(serializer.data['flatModel'] !=  "Any"):
+            extraUrl = extraUrl + ',"flat_model": "' + serializer.data['flatModel'] + '"'
+        govDataUrl = govDataUrl + extraUrl +"}"
+        
+        # 'flat_type": "' + serializer.data['flatType'] +'","flat_model":"'+serializer.data['flatModel']+'"}'
         response = requests.get(govDataUrl)
-        print(serializer.data['town'])
-        print(govDataUrl)
-        return Response(response.json(), status=status.HTTP_201_CREATED)
+        data =  response.json()
+
+        #print(data["result"]["records"])
+        data = filter(data,serializer.data['floorArea'],serializer.data['remainingLease'],serializer.data['floor'])
+        # print(serializer.data['town'])
+        # print(serializer.data)
+        #print(response.content)
+        #print(data)
+        print(data["result"]["records"])
+        return Response(data, status=status.HTTP_201_CREATED)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+def filter(datas,floorArea,lease,floor):
+
+    #remember recordData is a pointer to datas["result"]["records"] 
+    recordDatas = datas["result"]["records"]
+    #if empty list 
+    if not recordDatas:
+        return datas
+
+    
+    #filter the dropdown floorArea
+    if(floorArea == "< 40 SQM" or floorArea == "> 169 SQM"):
+        partsFloorArea = floorArea.split(" ")
+        lowFloorArea = 0
+        highFloorArea = int(partsFloorArea[1].split(" ")[0])
+    elif(floorArea != "Any"):
+        # partFloorArea[0] will be "70", partFloorArea[1] will be "79 SQM"
+        partsFloorArea = floorArea.split(" - ")
+        lowFloorArea = int(partsFloorArea[0])
+        highFloorArea =  int(partsFloorArea[1].split(" ")[0])
+    
+    #filter the dropdown remainingLease
+    if(lease == "< 50 YEARS" or lease == "> 89 YEARS"):    
+        partsLease = lease.split(" ")
+        lowLease = 0
+        highLease = int(partsLease[1].split(" ")[0])
+    elif(lease != "Any"):
+        partsLease = lease.split(" - ")
+        lowLease = int(partsLease[0])
+        highLease =  int(partsLease[1].split(" ")[0])
+
+    #filter the dropdown floor
+    if(floor == "> 30th"):    
+        partsFloor = floor.split(" ")
+        highFloor= int(partsFloor[1].split("th")[0])
+    elif(floor != "Any"):
+        if("st" in floor):
+            partsFloor = floor.split("st - ")
+            lowFloor = int(partsFloor[0])
+            highFloor = int(partsFloor[1].split("th")[0])
+        else:
+            partsFloor = floor.split("th - ")
+            lowFloor = int(partsFloor[0])
+            highFloor = int(partsFloor[1].split("th")[0])
+
+
+    #how to solve indexing when removing, can loop backwards or [:] which creates a new list
+    for recordData in recordDatas[:]:
+ 
+         #need to split as data is string has years and mths 92 year 11 months -> take years only
+        dataLease = int(recordData["remaining_lease"].split(" ")[0])
+     
+        #need to split data for floor given format is:"storey_range": "22 TO 24"
+        dataFloorLow = int(recordData["storey_range"].split(" TO ")[0])
+        dataFloorHigh = int(recordData["storey_range"].split(" TO ")[1])
+        
+        print(dataLease)
+
+        #remove one time dont need check alr
+        if(floorArea == "> 169 SQM" ):
+            if(floorArea != "Any" and not(int(recordData["floor_area_sqm"]) > highFloorArea)):
+                datas["result"]["records"].remove(recordData)
+                continue
+        elif(floorArea != "Any" and not(lowFloorArea <= int(recordData["floor_area_sqm"]) and int(recordData["floor_area_sqm"]) <= highFloorArea) ):
+            datas["result"]["records"].remove(recordData)
+            continue
+    
+        if(lease == "> 89 YEARS" ):
+            if(lease != "Any" and not(dataLease > highLease)):
+                datas["result"]["records"].remove(recordData)     
+                continue   
+        elif(lease != "Any" and not(lowLease <= dataLease and dataLease <= highLease)):
+            datas["result"]["records"].remove(recordData)
+            print("asdsad")
+            continue
+
+        if(floor == "> 30th"):
+            if(floor != "Any" and not(dataFloorLow > highFloor and dataFloorHigh > highFloor)):
+                datas["result"]["records"].remove(recordData)
+                continue
+        # 22 to 24 compared with 21st to 31th only need compare 22 with low and high 24 no need compare low agn
+        elif(floor != "Any" and not(dataFloorLow >= lowFloor and dataFloorLow <= highFloor and dataFloorHigh <= highFloor)):
+            datas["result"]["records"].remove(recordData)
+            continue
+ 
+
+    return datas
 
 # def test(request):
 #     response = requests.get('https://data.gov.sg/api/action/datastore_search?resource_id=f1765b54-a209-4718-8d38-a39237f502b3&filters={"town": "ANG MO KIO","flat_type": "3 ROOM","flat_model":"Improved"}')
