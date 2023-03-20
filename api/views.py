@@ -4,18 +4,21 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
 
-
-from api.serializers import PostSerializer
+from api.models import feedbackModel
+from api.serializers import *
 import requests
+import api.machineLearning as ml
 
 # Create your views here.
 @api_view(['POST'])
-def post_collection(request):
-    serializer = PostSerializer(data=request.data)
+def post_flat_data(request):
+    serializer = flatSerializer(data=request.data)
+
     if serializer.is_valid():
-        serializer.save()
+        #serializer.save() will save the data into the database 
+        #serializer.save()
         #if flat model or flatType is any 
-        govDataUrl ='https://data.gov.sg/api/action/datastore_search?resource_id=f1765b54-a209-4718-8d38-a39237f502b3&filters={"town":"'+ serializer.data['town'] + '"'
+        govDataUrl ='https://data.gov.sg/api/action/datastore_search?resource_id=f1765b54-a209-4718-8d38-a39237f502b3&sort=month desc&filters={"town":"'+ serializer.data['town'] + '"'
         extraUrl = ""
         if(serializer.data['flatType'] != "Any"):
             extraUrl =  ',"flat_type": "' + serializer.data['flatType'] + '"'
@@ -34,7 +37,8 @@ def post_collection(request):
         # print(serializer.data)
         #print(response.content)
         #print(data)
-        print(data["result"]["records"])
+        data["result"]["records"] = data["result"]["records"][0:10]
+        data["result"]["resaleValue"] = ml.runMl(request.data)
         return Response(data, status=status.HTTP_201_CREATED)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -94,7 +98,6 @@ def filter(datas,floorArea,lease,floor):
         dataFloorLow = int(recordData["storey_range"].split(" TO ")[0])
         dataFloorHigh = int(recordData["storey_range"].split(" TO ")[1])
         
-        print(dataLease)
 
         #remove one time dont need check alr
         if(floorArea == "> 169 SQM" ):
@@ -111,7 +114,6 @@ def filter(datas,floorArea,lease,floor):
                 continue   
         elif(lease != "Any" and not(lowLease <= dataLease and dataLease <= highLease)):
             datas["result"]["records"].remove(recordData)
-            print("asdsad")
             continue
 
         if(floor == "> 30th"):
@@ -129,3 +131,33 @@ def filter(datas,floorArea,lease,floor):
 # def test(request):
 #     response = requests.get('https://data.gov.sg/api/action/datastore_search?resource_id=f1765b54-a209-4718-8d38-a39237f502b3&filters={"town": "ANG MO KIO","flat_type": "3 ROOM","flat_model":"Improved"}')
 #     return JsonResponse(response.json())
+
+
+@api_view(['GET','POST'])
+def get_post_feedback(request):
+    if request.method == 'GET':
+        feedback = feedbackModel.objects.all()
+        serializer = feedbackSerializer(feedback, many=True)
+        data = serializer.data
+        for i, my_model in enumerate(feedback):
+            data[i]['id'] = my_model.pk  # Include the primary key in the response data
+        return Response(data)
+    elif request.method == 'POST':
+        serializer = feedbackSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response("ok",status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+@api_view(['DELETE'])
+def deleteFeedback(request,pk):
+        try:
+            instance = feedbackModel.objects.get(pk=pk)
+        except feedbackModel.DoesNotExist:
+            return Response({'error': 'Record not found.'}, status=404)
+
+        serializer = feedbackSerializer(instance)
+        instance.delete()
+
+        return Response(serializer.data, status=204)
+
