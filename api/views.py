@@ -27,16 +27,11 @@ def post_flat_data(request):
             extraUrl = extraUrl + ',"flat_model": "' + serializer.data['flatModel'] + '"'
         govDataUrl = govDataUrl + extraUrl +"}"
         
-        # 'flat_type": "' + serializer.data['flatType'] +'","flat_model":"'+serializer.data['flatModel']+'"}'
         response = requests.get(govDataUrl)
         data =  response.json()
 
-        #print(data["result"]["records"])
         data = filter(data,serializer.data['floorArea'],serializer.data['remainingLease'],serializer.data['floor'])
-        # print(serializer.data['town'])
-        # print(serializer.data)
-        #print(response.content)
-        #print(data)
+
         data["result"]["records"] = data["result"]["records"][0:10]
         data["result"]["resaleValue"] = ml.runMl(request.data)
         return Response(data, status=status.HTTP_201_CREATED)
@@ -127,11 +122,6 @@ def filter(datas,floorArea,lease,floor):
  
 
     return datas
-
-# def test(request):
-#     response = requests.get('https://data.gov.sg/api/action/datastore_search?resource_id=f1765b54-a209-4718-8d38-a39237f502b3&filters={"town": "ANG MO KIO","flat_type": "3 ROOM","flat_model":"Improved"}')
-#     return JsonResponse(response.json())
-
 
 @api_view(['GET','POST'])
 def get_post_feedback(request):
