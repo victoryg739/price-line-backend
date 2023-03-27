@@ -26,8 +26,9 @@ SECRET_KEY = 'django-insecure-63h#di52!gucz95n8lp8_0s)=7hkdicx*j0v$aida^8ny#d@@6
 DEBUG = False
 
 ALLOWED_HOSTS = [
-    '34.143.190.20',
+    '34.168.93.33',
     '127.0.0.1',
+    '*',
 ]
 
 
@@ -60,6 +61,7 @@ MIDDLEWARE = [
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "https://price-line.vercel.app",
+    "*",
     
 ]
 
