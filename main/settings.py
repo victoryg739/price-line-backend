@@ -61,6 +61,7 @@ MIDDLEWARE = [
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "https://price-line.vercel.app",
+    "https://price-line-ggjlmg6dw-victoryg739.vercel.app/",
     
     
 ]
