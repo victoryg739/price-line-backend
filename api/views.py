@@ -119,8 +119,6 @@ def filter(datas,floorArea,lease,floor):
         elif(floor != "Any" and not(dataFloorLow >= lowFloor and dataFloorLow <= highFloor and dataFloorHigh <= highFloor)):
             datas["result"]["records"].remove(recordData)
             continue
- 
-
     return datas
 
 @api_view(['GET','POST'])
